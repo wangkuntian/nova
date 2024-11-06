@@ -3906,13 +3906,14 @@ class ComputeManager(manager.Manager):
     @wrap_instance_event(prefix='compute')
     @wrap_instance_fault
     def backup_instance(self, context, image_id, instance, backup_type,
-                        rotation):
+                        rotation, volume_backend=False):
         """Backup an instance on this host.
 
         :param backup_type: daily | weekly
         :param rotation: int representing how many backups to keep around
         """
-        self._do_snapshot_instance(context, image_id, instance)
+        if not volume_backend:
+            self._do_snapshot_instance(context, image_id, instance)
         self._rotate_backups(context, instance, backup_type, rotation)
 
     @wrap_exception()

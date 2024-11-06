@@ -23,7 +23,7 @@ from nova.api import validation
 from nova.compute import api as compute
 from nova import exception
 from nova.policies import create_backup as cb_policies
-
+from nova.compute import utils as compute_utils
 
 class CreateBackupController(wsgi.Controller):
     def __init__(self):
@@ -55,6 +55,7 @@ class CreateBackupController(wsgi.Controller):
         image_name = common.normalize_name(entity["name"])
         backup_type = entity["backup_type"]
         rotation = int(entity["rotation"])
+        incremental = entity.get("incremental", False)
 
         props = {}
         metadata = entity.get('metadata', {})
@@ -66,8 +67,25 @@ class CreateBackupController(wsgi.Controller):
         props.update(metadata)
 
         try:
-            image = self.compute_api.backup(context, instance, image_name,
-                    backup_type, rotation, extra_properties=props)
+            if compute_utils.is_volume_backed_instance(context, instance):
+                image = self.compute_api.backup_volume_backed(
+                    context,
+                    instance,
+                    image_name,
+                    backup_type,
+                    rotation,
+                    incremental,
+                    extra_properties=props,
+                )
+            else:
+                image = self.compute_api.backup(
+                    context,
+                    instance,
+                    image_name,
+                    backup_type,
+                    rotation,
+                    extra_properties=props,
+                )
         except exception.InstanceInvalidState as state_error:
             common.raise_http_conflict_for_instance_invalid_state(state_error,
                     'createBackup', id)

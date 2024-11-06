@@ -29,6 +29,7 @@ create_backup = {
                 },
                 'rotation': parameter_types.non_negative_integer,
                 'metadata': parameter_types.metadata,
+                'incremental': {'type': 'boolean', 'default': False},
             },
             'required': ['name', 'backup_type', 'rotation'],
             'additionalProperties': False,

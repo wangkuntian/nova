@@ -361,6 +361,12 @@ def _untranslate_snapshot_summary_view(context, snapshot):
     return d
 
 
+def _untranslate_backup_summary_view(context, backup):
+    """Maps keys for backup summary view."""
+    d = {'id': backup.id, 'display_name': backup.name}
+    return d
+
+
 def _translate_attachment_ref(attachment_ref):
     """Building old style connection_info by adding the 'data' key back."""
     translated_con_info = {}
@@ -727,6 +733,21 @@ class API(object):
     @translate_snapshot_exception
     def delete_snapshot(self, context, snapshot_id):
         cinderclient(context).volume_snapshots.delete(snapshot_id)
+
+    @translate_mixed_exceptions
+    def create_backup_force(
+            self, context, volume_id, name, description, incremental
+    ):
+        item = cinderclient(context).backups.create(
+            volume_id,
+            container=None,
+            name=name,
+            description=description,
+            incremental=incremental,
+            force=True,
+            snapshot_id=None,
+        )
+        return _untranslate_backup_summary_view(context, item)
 
     @translate_cinder_exception
     def get_all_volume_types(self, context):

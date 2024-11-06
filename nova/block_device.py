@@ -311,6 +311,28 @@ def snapshot_from_bdm(snapshot_id, template):
     return BlockDeviceDict(snapshot_dict)
 
 
+def backup_from_bdm(backup_id, template):
+    """Create a basic volume snapshot BDM from a given template bdm."""
+
+    copy_from_template = (
+        'disk_bus',
+        'device_type',
+        'boot_index',
+        'delete_on_termination',
+        'volume_size',
+        'device_name',
+    )
+    backup_dict = {
+        'source_type': 'backup',
+        'destination_type': 'volume',
+        'backup_id': backup_id,
+    }
+    for key in copy_from_template:
+        backup_dict[key] = template.get(key)
+    return BlockDeviceDict(backup_dict)
+
+
+
 def legacy_mapping(block_device_mapping):
     """Transform a list of block devices of an instance back to the
     legacy data format.

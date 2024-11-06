@@ -1296,7 +1296,7 @@ class ComputeAPI(object):
         return cctxt.call(ctxt, 'reserve_block_device_name', **kw)
 
     def backup_instance(self, ctxt, instance, image_id, backup_type,
-                        rotation):
+                        rotation, volume_backend=False):
         version = '5.0'
         cctxt = self.router.client(ctxt).prepare(
                 server=_compute_host(None, instance), version=version)
@@ -1304,7 +1304,8 @@ class ComputeAPI(object):
                    instance=instance,
                    image_id=image_id,
                    backup_type=backup_type,
-                   rotation=rotation)
+                   rotation=rotation,
+                   volume_backend=volume_backend)
 
     def snapshot_instance(self, ctxt, instance, image_id):
         version = '5.0'

@@ -3137,6 +3137,183 @@ class API(base.Base):
                     raise exception.InstanceNotFound(instance_id=instance.uuid)
         return instance
 
+    @check_instance_state(
+        vm_state=[
+            vm_states.ACTIVE,
+            vm_states.STOPPED,
+            vm_states.PAUSED,
+            vm_states.SUSPENDED,
+        ]
+    )
+    def backup_volume_backed(
+            self,
+            context,
+            instance,
+            name,
+            backup_type,
+            rotation,
+            incremental,
+            extra_properties=None,
+    ):
+        """Backup the given volume-backed instance.
+        :returns: the new image metadata
+        """
+        properties = {
+            'instance_uuid': instance.uuid,
+            'user_id': str(context.user_id),
+            'image_type': 'backup',
+            'backup_type': backup_type,
+        }
+        properties.update(extra_properties or {})
+
+        image_meta = compute_utils.initialize_instance_snapshot_metadata(
+            context, instance, name, properties
+        )
+        image_meta['name'] = f'backup for instance {instance.uuid}'
+        image_meta['size'] = 0
+        for attr in ('container_format', 'disk_format'):
+            image_meta.pop(attr, None)
+        properties = image_meta['properties']
+        # clean properties before filling
+        for key in ('block_device_mapping', 'bdm_v2', 'root_device_name'):
+            properties.pop(key, None)
+        if instance.root_device_name:
+            properties['root_device_name'] = instance.root_device_name
+
+        bdms = objects.BlockDeviceMappingList.get_by_instance_uuid(
+            context, instance.uuid
+        )
+
+        mapping = []
+        volume_bdms = []
+        for bdm in bdms:
+            if bdm.no_device:
+                continue
+            if bdm.is_volume:
+                volume_bdms.append(bdm)
+            else:
+                mapping.append(bdm.get_image_mapping())
+
+        if volume_bdms:
+            limits = self.volume_api.get_absolute_limits(context)
+            total_backups_used = limits['totalBackupsUsed']
+            max_backups = limits['maxTotalBackups']
+            # -1 means there is unlimited quota for backups
+            if -1 < max_backups < len(volume_bdms) + total_backups_used:
+                LOG.debug(
+                    'Unable to create volume backups for instance. '
+                    'Currently has %s backups, requesting %s new '
+                    'backups, with a limit of %s.',
+                    total_backups_used,
+                    len(volume_bdms),
+                    max_backups,
+                    instance=instance,
+                )
+                raise exception.OverQuota(overs='backups')
+
+        quiesced = False
+        if instance.vm_state == vm_states.ACTIVE:
+            try:
+                LOG.info(
+                    "Attempting to quiesce instance before volume backup.",
+                    instance=instance,
+                )
+                self.compute_rpcapi.quiesce_instance(context, instance)
+                quiesced = True
+            except (
+                    exception.InstanceQuiesceNotSupported,
+                    exception.QemuGuestAgentNotEnabled,
+                    exception.NovaException,
+                    NotImplementedError,
+            ) as err:
+                if strutils.bool_from_string(
+                        instance.system_metadata.get('image_os_require_quiesce')
+                ):
+                    raise
+
+                if isinstance(err, exception.NovaException):
+                    LOG.info(
+                        'Skipping quiescing instance: %(reason)s.',
+                        {'reason': err.format_message()},
+                        instance=instance,
+                    )
+                else:
+                    LOG.info(
+                        'Skipping quiescing instance because the '
+                        'operation is not supported by the underlying '
+                        'compute driver.',
+                        instance=instance,
+                    )
+            # NOTE(tasker): discovered that an uncaught exception could occur
+            #               after the instance has been frozen. catch and thaw.
+            except Exception as ex:
+                with excutils.save_and_reraise_exception():
+                    LOG.error(
+                        "An error occurred during quiesce of instance. "
+                        "Unquiescing to ensure instance is thawed. "
+                        "Error: %s",
+                        six.text_type(ex),
+                        instance=instance,
+                    )
+                    self.compute_rpcapi.unquiesce_instance(
+                        context, instance, mapping=None
+                    )
+
+        @wrap_instance_event(prefix='api')
+        def backup_instance(self, context, instance, volume_bdms):
+            try:
+                for bdm in volume_bdms:
+                    volume = self.volume_api.get(context, bdm.volume_id)
+                    name = f'backup for instance {instance.uuid}'
+                    LOG.debug(
+                        'Creating backup for volume %s.',
+                        volume['id'],
+                        instance=instance,
+                    )
+                    backup = self.volume_api.create_backup_force(
+                        context,
+                        volume['id'],
+                        name,
+                        volume['display_description'],
+                        incremental,
+                    )
+                    mapping_dict = block_device.backup_from_bdm(
+                        backup['id'], bdm
+                    )
+                    mapping_dict = mapping_dict.get_image_mapping()
+                    mapping.append(mapping_dict)
+                return mapping
+            except Exception:
+                with excutils.save_and_reraise_exception():
+                    if quiesced:
+                        LOG.info(
+                            "Unquiescing instance after volume backup "
+                            "failure.",
+                            instance=instance,
+                        )
+                        self.compute_rpcapi.unquiesce_instance(
+                            context, instance, mapping
+                        )
+
+        self._record_action_start(context, instance, instance_actions.BACKUP)
+        mapping = backup_instance(self, context, instance, volume_bdms)
+
+        if quiesced:
+            self.compute_rpcapi.unquiesce_instance(context, instance, mapping)
+
+        if mapping:
+            properties['block_device_mapping'] = mapping
+            properties['bdm_v2'] = True
+        image_meta = self.image_api.create(context, image_meta)
+
+        instance.task_state = task_states.VOLUME_BACKUP
+        instance.save(expected_task_state=[None])
+
+        self.compute_rpcapi.backup_instance(
+            context, instance, image_meta['id'], backup_type, rotation, True
+        )
+        return image_meta
+
     # NOTE(melwitt): We don't check instance lock for backup because lock is
     #                intended to prevent accidental change/delete of instances
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED,

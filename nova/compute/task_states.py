@@ -39,6 +39,7 @@ IMAGE_UPLOADING = fields.InstanceTaskState.IMAGE_UPLOADING
 
 # possible task states during backup()
 IMAGE_BACKUP = fields.InstanceTaskState.IMAGE_BACKUP
+VOLUME_BACKUP = fields.InstanceTaskState.VOLUME_BACKUP
 
 # possible task states during set_admin_password()
 UPDATING_PASSWORD = fields.InstanceTaskState.UPDATING_PASSWORD
