@@ -169,6 +169,8 @@ class Architecture(BaseNovaEnum):
     XTENSA = arch.XTENSA
     XTENSAEB = arch.XTENSAEB
 
+    LOONGARCH64 = arch.LOONGARCH64
+
     ALL = arch.ALL
 
     @classmethod
@@ -214,6 +216,9 @@ class Architecture(BaseNovaEnum):
 
         if newname == "amd64":
             newname = cls.X86_64
+
+        if newname == "loongarch64":
+            newname = cls.LOONGARCH64
 
         if not cls.is_valid(newname):
             raise exception.InvalidArchitectureName(arch=name)

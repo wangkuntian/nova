@@ -635,6 +635,7 @@ def get_default_machine_type(arch: str) -> ty.Optional[str]:
         obj_fields.Architecture.S390X: "s390-ccw-virtio",
         obj_fields.Architecture.I686: "pc",
         obj_fields.Architecture.X86_64: "pc",
+        obj_fields.Architecture.LOONGARCH64: "loongson7a_v1.0",
     }
     return default_mtypes.get(arch)
 

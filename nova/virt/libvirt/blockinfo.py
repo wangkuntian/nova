@@ -264,7 +264,9 @@ def get_disk_bus_for_device_type(instance,
                     obj_fields.Architecture.PPC64LE,
                     obj_fields.Architecture.S390,
                     obj_fields.Architecture.S390X,
-                    obj_fields.Architecture.AARCH64):
+                    obj_fields.Architecture.AARCH64,
+                    obj_fields.Architecture.LOONGARCH64,
+            ):
                 return "scsi"
             machine_type = libvirt_utils.get_machine_type(image_meta)
             # NOTE(lyarwood): We can't be any more explicit here as QEMU

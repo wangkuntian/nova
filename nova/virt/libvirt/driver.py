@@ -45,6 +45,7 @@ import tempfile
 import time
 import typing as ty
 import uuid
+import platform
 
 from castellan import key_manager
 from copy import deepcopy
@@ -145,7 +146,8 @@ DEFAULT_UEFI_LOADER_PATH = {
                '/usr/share/OVMF/OVMF_CODE.secboot.fd',
                '/usr/share/qemu/ovmf-x86_64-code.bin'],
     "aarch64": ['/usr/share/AAVMF/AAVMF_CODE.fd',
-                '/usr/share/qemu/aavmf-aarch64-code.bin']
+                '/usr/share/qemu/aavmf-aarch64-code.bin'],
+    "loongarch64": ['/usr/share/qemu-kvm/loongarch_bios.bin'],
 }
 
 MAX_CONSOLE_BYTES = 100 * units.Ki
@@ -4680,6 +4682,9 @@ class LibvirtDriver(driver.ComputeDriver):
                              'migration can break unless all compute nodes '
                              'have identical cpus. AArch64 does not support '
                              'other modes.')
+                elif caps.host.cpu.arch == fields.Architecture.LOONGARCH64:
+                    mode = "custom"
+                    model = "Loongson-3A5000"
                 else:
                     mode = "host-model"
             if mode == "none":
@@ -4690,6 +4695,9 @@ class LibvirtDriver(driver.ComputeDriver):
                 if caps.host.cpu.arch == fields.Architecture.AARCH64:
                     if not models:
                         models = ['max']
+                if caps.host.cpu.arch == fields.Architecture.LOONGARCH64:
+                    if not models:
+                        models = ["Loongson-3A5000"]
 
         else:
             if mode is None or mode == "none":
@@ -4951,6 +4959,12 @@ class LibvirtDriver(driver.ComputeDriver):
             scsi_controller = vconfig.LibvirtConfigGuestController()
             scsi_controller.type = 'scsi'
             scsi_controller.model = hw_scsi_model
+            scsi_controller.index = 0
+            return scsi_controller
+        elif platform.machine() == fields.Architecture.LOONGARCH64:
+            scsi_controller = vconfig.LibvirtConfigGuestController()
+            scsi_controller.type = 'scsi'
+            scsi_controller.model = 'virtio-scsi'
             scsi_controller.index = 0
             return scsi_controller
 
@@ -5767,7 +5781,8 @@ class LibvirtDriver(driver.ComputeDriver):
     def _has_uefi_support(self):
         # This means that the host can support UEFI booting for guests
         supported_archs = [fields.Architecture.X86_64,
-                           fields.Architecture.AARCH64]
+                           fields.Architecture.AARCH64,
+                           fields.Architecture.LOONGARCH64,]
         caps = self._host.get_capabilities()
         # TODO(dmllr, kchamart): Get rid of probing the OVMF binary file
         # paths, it is not robust, because nothing but the binary's
@@ -5840,6 +5855,9 @@ class LibvirtDriver(driver.ComputeDriver):
             if caps.host.cpu.arch == fields.Architecture.AARCH64:
                 if not hw_firmware_type:
                     hw_firmware_type = fields.FirmwareType.UEFI
+            if caps.host.cpu.arch == fields.Architecture.LOONGARCH64:
+                if not hw_firmware_type:
+                    hw_firmware_type = fields.FirmwareType.UEFI
             if hw_firmware_type == fields.FirmwareType.UEFI:
                 if self._has_uefi_support():
                     global uefi_logged
@@ -5851,7 +5869,10 @@ class LibvirtDriver(driver.ComputeDriver):
                     for lpath in DEFAULT_UEFI_LOADER_PATH[caps.host.cpu.arch]:
                         if os.path.exists(lpath):
                             guest.os_loader = lpath
-                    guest.os_loader_type = "pflash"
+                    if caps.host.cpu.arch in (fields.Architecture.LOONGARCH64):
+                        guest.os_loader_type = "rom"
+                    else:
+                        guest.os_loader_type = "pflash"
                 else:
                     raise exception.UEFINotSupported()
             guest.os_mach_type = libvirt_utils.get_machine_type(image_meta)
@@ -6108,6 +6129,9 @@ class LibvirtDriver(driver.ComputeDriver):
                 guest.os_mach_type is not None and
                 'q35' in guest.os_mach_type):
             return True
+        if (caps.host.cpu.arch == fields.Architecture.LOONGARCH64 and
+                guest.os_mach_type is not None):
+            return True
         return False
 
     def _guest_add_usb_host_keyboard(self, guest):
@@ -6232,6 +6256,8 @@ class LibvirtDriver(driver.ComputeDriver):
             # x86(-64) and ppc64 have usb host controller and keyboard
             # s390x does not support USB
             if caps.host.cpu.arch == fields.Architecture.AARCH64:
+                self._guest_add_usb_host_keyboard(guest)
+            elif caps.host.cpu.arch == fields.Architecture.LOONGARCH64:
                 self._guest_add_usb_host_keyboard(guest)
 
         # Some features are only supported 'qemu' and 'kvm' hypervisor
@@ -7601,7 +7627,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 self._host.has_min_version(hv_type=host.HV_DRIVER_QEMU)):
             return True
         elif (caps.host.cpu.arch in (fields.Architecture.PPC64,
-                                     fields.Architecture.PPC64LE)):
+                                     fields.Architecture.PPC64LE,
+                                     fields.Architecture.LOONGARCH64)):
             return True
 
         return False
