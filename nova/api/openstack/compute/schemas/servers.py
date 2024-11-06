@@ -522,6 +522,19 @@ revert = {
     'additionalProperties': False
 }
 
+detach = {
+    'type': 'object',
+    'properties': {
+        'detach': {
+            'type': 'object',
+            'additionalProperties': False,
+        }
+    },
+    'required': ['detach'],
+    'additionalProperties': False
+}
+
+
 trigger_crash_dump = {
     'type': 'object',
     'properties': {

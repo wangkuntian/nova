@@ -2378,3 +2378,18 @@ class InvalidVolumeSnapshotStatus(Invalid):
     msg_fmt = _("The status of snapshot %(snapshot_id)s "
                 "for volume %(volume_id)s "
                 "is not available but %(status)s.")
+
+
+class InvalidImageWhenDetach(Invalid):
+    msg_fmt = _("Instance %(instance_id)s boot from volume, "
+                "can not be detached")
+
+
+class InvalidImageFormatWhenDetach(Invalid):
+    msg_fmt = _("Image %(image_id)s disk format should be iso "
+                "but %(disk_format)s")
+
+
+class InvalidBdmWhenDetach(Invalid):
+    msg_fmt = _("Instance %(instance.uuid)s has not "
+                "been attached a volume yet")

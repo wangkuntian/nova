@@ -5585,6 +5585,60 @@ class API(base.Base):
             self.volume_api.revert_to_snapshot_ut(
                 context, volume_id, snapshot_id)
 
+    @check_instance_lock
+    @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED])
+    def detach(self, context, instance):
+        if not instance.image_ref:
+            LOG.info(f'Instance {instance.uuid} boot from volume.')
+            raise exception.InvalidImageWhenDetach(instance_id=instance.uuid)
+
+        image = self.image_api.get(context, instance.image_ref)
+        disk_format = image.get('disk_format', None)
+        if disk_format != 'iso':
+            raise exception.InvalidImageFormatWhenDetach(
+                image_id=instance.image_ref, disk_format=disk_format)
+
+        bdms = objects.BlockDeviceMappingList.get_by_instance_uuid(
+            context, instance.uuid)
+
+        if len(bdms) == 1:
+            bdm = bdms[0]
+            if bdm.is_image:
+                raise exception.InvalidBdmWhenDetach(instance_id=instance.uuid)
+
+        image_bdm = None
+        root_bdm = None
+        for bdm in bdms:
+            if bdm.is_image:
+                image_bdm = bdm
+            elif bdm.is_volume:
+                if 'vda' in bdm.device_name or 'sda' in bdm.device_name:
+                    root_bdm = bdm
+        if not root_bdm:
+            message = f"Instance {instance.uuid} does not " \
+                      f"have any bootable volumes"
+            raise exception.InvalidBdmWhenDetach(message=message)
+
+        self._record_action_start(
+            context, instance, instance_actions.DETACH_ISO)
+
+        root_bdm.boot_index = 0
+        root_bdm.save()
+
+        if image_bdm:
+            image_bdm.boot_index = None
+            image_bdm.save()
+
+        LOG.info(f'Instance {instance.uuid} detach iso from volume success')
+
+        instance.task_state = task_states.REBOOTING_HARD
+        instance.save(expected_task_state=task_states.ALLOW_REBOOT)
+
+        LOG.info(f'Instance {instance.uuid} starts to hard reboot')
+        self.compute_rpcapi.reboot_instance(context, instance=instance,
+                                            block_device_info=None,
+                                            reboot_type='HARD')
+
 
 def target_host_cell(fn):
     """Target a host-based function to a cell.

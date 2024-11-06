@@ -494,6 +494,16 @@ https://bugs.launchpad.net/nova/+bug/1739646 for details.
                 'path': '/servers/{server_id}/action (revert)'
             }
         ]),
+    policy.DocumentedRuleDefault(
+        name=SERVERS % 'detach',
+        check_str=base.PROJECT_MEMBER_OR_SYSTEM_ADMIN,
+        description="Detach a server which use ios image",
+        operations=[
+            {
+                'method': 'POST',
+                'path': '/servers/{server_id}/action (detach)'
+            }
+        ]),
 ]
 
 

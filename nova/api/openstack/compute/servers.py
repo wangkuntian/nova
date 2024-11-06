@@ -1399,6 +1399,28 @@ class ServersController(wsgi.Controller):
         except (exception.SnapshotNotFound, exception.VolumeNotFound)as ex:
             raise exc.HTTPNotFound(explanation=ex.format_message())
 
+    @wsgi.response(202)
+    @wsgi.expected_errors((400, 404, 409))
+    @wsgi.action('detach')
+    @validation.schema(schema_servers.detach)
+    def _action_detach(self, req, id, body):
+        context = req.environ['nova.context']
+        context.can(server_policies.SERVERS % 'detach')
+        instance = self._get_server(context, req, id)
+        try:
+            self.compute_api.detach(context, instance)
+        except exception.InstanceIsLocked as e:
+            raise exc.HTTPConflict(explanation=e.format_message())
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(
+                state_error, 'detach', id)
+        except exception.ImageNotFound as ex:
+            raise exc.HTTPNotFound(explanation=ex.format_message())
+        except (exception.InvalidImageWhenDetach,
+                exception.InvalidImageFormatWhenDetach,
+                exception.InvalidBdmWhenDetach) as ex:
+            raise exc.HTTPBadRequest(explanation=ex.format_message())
+
 
 def remove_invalid_options(context, search_options, allowed_search_options):
     """Remove search options that are not permitted unless policy allows."""
