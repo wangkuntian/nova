@@ -1368,6 +1368,37 @@ class ServersController(wsgi.Controller):
             common.raise_http_conflict_for_instance_invalid_state(state_error,
                 'trigger_crash_dump', id)
 
+    @wsgi.response(202)
+    @wsgi.expected_errors((400, 404, 409))
+    @wsgi.action('revert')
+    @validation.schema(schema_servers.revert)
+    def _action_revert(self, req, id, body):
+        context = req.environ['nova.context']
+        context.can(server_policies.SERVERS % 'revert')
+        snapshot_id = body['revert']['snapshot_id']
+        instance = self._get_server(context, req, id)
+        if not compute_utils.is_volume_backed_instance(context, instance):
+            explanation = (
+                f"Revert instance to snapshot "
+                f"only support volume backend, "
+                f"server {id} boot from image {instance.image_ref}.")
+            raise exc.HTTPBadRequest(explanation=explanation)
+        try:
+            self.compute_api.revert(context, instance, snapshot_id)
+        except exception.InstanceIsLocked as e:
+            raise exc.HTTPConflict(explanation=e.format_message())
+        except exception.InstanceInvalidState as state_error:
+            common.raise_http_conflict_for_instance_invalid_state(
+                state_error, 'revert', id)
+        except exception.ImageNotFound:
+            explanation = f'Snapshot {snapshot_id} not found.'
+            raise exc.HTTPNotFound(explanation=explanation)
+        except (exception.InconsistentServerSnapshot,
+                exception.InvalidVolumeSnapshotStatus) as ex:
+            raise exc.HTTPBadRequest(explanation=ex.format_message())
+        except (exception.SnapshotNotFound, exception.VolumeNotFound)as ex:
+            raise exc.HTTPNotFound(explanation=ex.format_message())
+
 
 def remove_invalid_options(context, search_options, allowed_search_options):
     """Remove search options that are not permitted unless policy allows."""

@@ -924,3 +924,8 @@ class API(object):
                           {'id': attachment_id,
                            'msg': six.text_type(ex),
                            'code': getattr(ex, 'code', None)})
+
+    @translate_volume_exception
+    def revert_to_snapshot_ut(self, context, volume_id, snapshot_id):
+        client = cinderclient(context, microversion='3.40')
+        client.volumes.revert_to_snapshot_ut(volume_id, snapshot_id)

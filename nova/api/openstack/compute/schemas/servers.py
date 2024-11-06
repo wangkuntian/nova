@@ -505,6 +505,23 @@ reboot = {
     'additionalProperties': False
 }
 
+
+revert = {
+    'type': 'object',
+    'properties': {
+        'revert': {
+            'type': 'object',
+            'properties': {
+                'snapshot_id': parameter_types.snapshot_id,
+            },
+            'required': ['snapshot_id'],
+            'additionalProperties': False
+        }
+    },
+    'required': ['revert'],
+    'additionalProperties': False
+}
+
 trigger_crash_dump = {
     'type': 'object',
     'properties': {

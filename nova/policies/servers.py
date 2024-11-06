@@ -484,6 +484,16 @@ https://bugs.launchpad.net/nova/+bug/1739646 for details.
             }
         ],
         scope_types=['system', 'project']),
+    policy.DocumentedRuleDefault(
+        name=SERVERS % 'revert',
+        check_str=base.PROJECT_MEMBER_OR_SYSTEM_ADMIN,
+        description="Revert a server with snapshot ID",
+        operations=[
+            {
+                'method': 'POST',
+                'path': '/servers/{server_id}/action (revert)'
+            }
+        ]),
 ]
 
 

@@ -3249,6 +3249,13 @@ class API(base.Base):
 
         :returns: the new image metadata
         """
+        properties = {
+            'instance_uuid': instance.uuid,
+            'user_id': str(context.user_id),
+            'image_type': 'snapshot'
+        }
+        properties.update(extra_properties or {})
+
         image_meta = compute_utils.initialize_instance_snapshot_metadata(
             context, instance, name, extra_properties)
         # the new image is simply a bucket of properties (particularly the
@@ -5539,6 +5546,44 @@ class API(base.Base):
                 host_status = fields_obj.HostStatus.NONE
             host_statuses[instance.uuid] = host_status
         return host_statuses
+
+    @check_instance_lock
+    @check_instance_state(vm_state=[vm_states.STOPPED])
+    def revert(self, context, instance, image_id):
+        """Revert the given instance."""
+        image_snapshot = self.image_api.get(context, image_id)
+        image_properties = image_snapshot.get('properties', {})
+        instance_uuid = image_properties.get('instance_uuid', None)
+        if instance_uuid != instance.uuid:
+            raise exception.InconsistentServerSnapshot(
+                snapshot_id=image_id, instance_id=instance.uuid)
+        mappings = dict()
+        block_device_mappings = image_properties.get(
+            'block_device_mapping', [])
+        for block_device in block_device_mappings:
+            snapshot_id = block_device['snapshot_id']
+            snapshot = self.volume_api.get_snapshot(context, snapshot_id)
+            volume_id = snapshot['volume_id']
+            status = snapshot.get('status', None)
+            if status != 'available':
+                raise exception.InvalidVolumeSnapshotStatus(
+                    snapshot_id=snapshot_id,
+                    volume_id=volume_id,
+                    status=status)
+            _ = self.volume_api.get(context, volume_id)
+            mappings[snapshot['volume_id']] = snapshot_id
+
+        if mappings:
+            instance.task_state = task_states.REVERTING
+            instance.save(expected_task_state=[None])
+            self._record_action_start(context, instance,
+                                      instance_actions.REVERT)
+
+        for volume_id, snapshot_id in mappings.items():
+            LOG.debug(f"Sever {instance.id}'s volume {volume_id} reverting to "
+                      f"volume snapshot {snapshot_id}.")
+            self.volume_api.revert_to_snapshot_ut(
+                context, volume_id, snapshot_id)
 
 
 def target_host_cell(fn):

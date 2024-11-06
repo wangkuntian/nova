@@ -2367,3 +2367,14 @@ class ProviderConfigException(NovaException):
     """
     msg_fmt = _("An error occurred while processing "
                 "a provider config file: %(error)s")
+
+
+class InconsistentServerSnapshot(Invalid):
+    msg_fmt = _("Snapshot %(snapshot_id)s does not belong to "
+                "instance %(instance_id)s.")
+
+
+class InvalidVolumeSnapshotStatus(Invalid):
+    msg_fmt = _("The status of snapshot %(snapshot_id)s "
+                "for volume %(volume_id)s "
+                "is not available but %(status)s.")

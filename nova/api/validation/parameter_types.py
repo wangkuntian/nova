@@ -335,6 +335,9 @@ volume_id = {
     'type': 'string', 'format': 'uuid'
 }
 
+snapshot_id = {
+    'type': 'string', 'format': 'uuid'
+}
 
 attachment_id = {
     'type': 'string', 'format': 'uuid'
