@@ -485,8 +485,9 @@ class OSType(BaseNovaEnum):
 
     LINUX = "linux"
     WINDOWS = "windows"
+    UOS = 'uos'
 
-    ALL = (LINUX, WINDOWS)
+    ALL = (LINUX, WINDOWS, UOS)
 
     def coerce(self, obj, attr, value):
         # Some code/docs use upper case or initial caps

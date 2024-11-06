@@ -6247,6 +6247,8 @@ class LibvirtDriver(driver.ComputeDriver):
 
         self._guest_add_spice_channel(guest)
 
+        self._guest_add_sound_device(guest, instance)
+
         if self._guest_add_video_device(guest):
             self._add_video_driver(guest, image_meta, flavor)
 
@@ -6432,6 +6434,15 @@ class LibvirtDriver(driver.ComputeDriver):
             channel.type = 'spicevmc'
             channel.target_name = "com.redhat.spice.0"
             guest.add_device(channel)
+
+    @staticmethod
+    def _guest_add_sound_device(guest: vconfig.LibvirtConfigGuest,
+                                instance: objects.Instance):
+        # not support for arm64 machine
+        # so do not add the os_type property to arm64 image
+        if instance.os_type in ['windows', 'uos']:
+            sound = vconfig.LibvirtConfigGuestSound()
+            guest.add_device(sound)
 
     @staticmethod
     def _guest_add_memory_balloon(guest):
