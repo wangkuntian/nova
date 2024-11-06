@@ -1643,3 +1643,16 @@ class ConsoleAuthToken(BASE, NovaBase):
                     'Instance.deleted == 0)',
         foreign_keys=instance_uuid
     )
+
+
+class InstanceScreenshot(BASE, NovaBase, models.SoftDeleteMixin):
+    __tablename__ = 'instance_screenshots'
+    __table_args__ = (
+        Index('screenshots_uuid_idx', 'uuid', unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
+    uuid = Column(String(36))
+    instance_uuid = Column(String(36), ForeignKey('instances.uuid'))
+    name = Column(String(255))
+    extra = Column(Text)

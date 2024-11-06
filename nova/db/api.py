@@ -1428,3 +1428,32 @@ def console_auth_token_destroy_expired_by_host(context, host):
     tokens associated with the given host.
     """
     return IMPL.console_auth_token_destroy_expired_by_host(context, host)
+
+
+def screenshot_get_by_id(context, screenshot_id):
+    return IMPL.screenshot_get_by_id(context, screenshot_id)
+
+
+def screenshot_get_by_uuid(context, screenshot_uuid):
+    return IMPL.screenshot_get_by_uuid(context, screenshot_uuid)
+
+
+def screenshot_get_all_by_instance(
+    context,
+    instance_uuid,
+    sort_key='created_at',
+    sort_dir='desc',
+    limit=None,
+    marker=None,
+):
+    return IMPL.screenshot_get_all_by_instance(
+        context, instance_uuid, sort_key, sort_dir, limit, marker
+    )
+
+
+def screenshot_create(context, values):
+    return IMPL.screenshot_create(context, values)
+
+
+def screenshot_destroy(context, screenshot_id):
+    return IMPL.screenshot_destroy(context, screenshot_id)

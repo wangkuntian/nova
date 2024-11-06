@@ -1502,3 +1502,19 @@ class ComputeAPI(object):
                                call_monitor_timeout=CONF.rpc_response_timeout,
                                timeout=CONF.long_rpc_timeout)
         return cctxt.call(ctxt, 'cache_images', image_ids=image_ids)
+
+    def take_screenshot(self, ctxt, instance, screenshot):
+        version = '5.0'
+        cctxt = self.router.client(ctxt).prepare(
+            server=_compute_host(None, instance), version=version
+        )
+        kwargs = {'instance': instance, 'screenshot': screenshot}
+        return cctxt.call(ctxt, 'take_screenshot', **kwargs)
+
+    def delete_screenshot(self, ctxt, instance, screenshot):
+        version = '5.0'
+        cctxt = self.router.client(ctxt).prepare(
+            server=_compute_host(None, instance), version=version
+        )
+        kwargs = {'instance': instance, 'screenshot': screenshot}
+        return cctxt.cast(ctxt, 'delete_screenshot', **kwargs)

@@ -102,6 +102,7 @@ from nova.pci import utils as pci_utils
 import nova.privsep.libvirt
 import nova.privsep.path
 import nova.privsep.utils
+from nova.storage import s3_utils
 from nova.storage import rbd_utils
 from nova import utils
 from nova import version
@@ -11452,3 +11453,75 @@ class LibvirtDriver(driver.ComputeDriver):
                               ' of host capabilities: %(error)s',
                               {'uri': self._host._uri, 'error': ex})
                     return None
+
+    def take_screenshot(self, instance, screenshot):
+        LOG.info('creating screenshot for instance %s', instance.uuid)
+        guest = self._host.get_guest(instance)
+        stream = self._conn.newStream()
+        try:
+            guest.take_screenshot(stream, screenshot.screen)
+        except exception.InstanceScreenNotFound:
+            pass
+        file_name = f'{screenshot.uuid}.{screenshot.format.lower()}'
+        file = os.path.join(CONF.instances_path, instance.uuid, file_name)
+        with open(file, 'wb') as f:
+            while True:
+                chunk = stream.recv(1024)
+                if not chunk:
+                    break
+                f.write(chunk)
+        stream.finish()
+        size = os.path.getsize(file)
+        if size <= 0:
+            LOG.info('empty screenshot file %s, try to remove', file)
+            os.remove(file)
+        else:
+            LOG.info('save screenshot to %s, size: %s bytes', file, size)
+            screenshot.size = size
+            screenshot.path = file
+            try:
+                from PIL import Image
+                image = Image.open(file)
+                screenshot.width = image.width
+                screenshot.height = image.height
+                image.save(file)
+            except ImportError:
+                LOG.warning('Package Pillow not installed, '
+                            'skip get screenshot dimension and transform')
+            screenshot.save()
+
+        if CONF.s3.enabled:
+            LOG.info('uploading screenshot to s3')
+            try:
+                s3_client = s3_utils.get_client()
+                result, remote = s3_client.upload(
+                    bucket=CONF.s3.bucket,
+                    file_path=str(file),
+                    object_name=f'{instance.uuid}/{file_name}',
+                )
+                if result:
+                    LOG.info('uploading screenshot to s3 success')
+                    screenshot.remote = remote
+                    screenshot.save()
+                else:
+                    LOG.error('uploading screenshot to s3 failed')
+            except ImportError as e:
+                LOG.error(f'{e.msg}, skip uploading')
+        else:
+            LOG.info('s3 not configured, skip uploading')
+
+    def delete_screenshot(self, instance, screenshot):
+        if screenshot.remote and CONF.s3.enabled:
+            try:
+                s3_client = s3_utils.get_client()
+                object_name = os.path.basename(screenshot.remote)
+                s3_client.delete_object(CONF.s3.bucket, object_name)
+            except ImportError as e:
+                LOG.error(f'{e.msg}, skip delete screenshot')
+        if screenshot.path:
+            try:
+                LOG.info('delete local screenshot')
+                os.remove(screenshot.path)
+            except OSError as e:
+                LOG.info(f'{e}, when delete local screenshot {screenshot.uuid}')
+        LOG.info('delete screenshot success')

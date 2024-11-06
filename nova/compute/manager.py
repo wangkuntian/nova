@@ -10807,3 +10807,10 @@ class ComputeManager(manager.Manager):
             LOG.debug("Updating migrate VIF profile for port %(port_id)s:"
                       "%(profile)s", {'port_id': port_id,
                                       'profile': profile})
+
+    def take_screenshot(self, context, instance, screenshot):
+        self.driver.take_screenshot(instance, screenshot)
+        return screenshot
+
+    def delete_screenshot(self, context, instance, screenshot):
+        self.driver.delete_screenshot(instance, screenshot)

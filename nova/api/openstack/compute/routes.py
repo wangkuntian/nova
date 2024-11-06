@@ -87,6 +87,7 @@ from nova.api.openstack.compute import virtual_interfaces
 from nova.api.openstack.compute import volumes
 from nova.api.openstack import wsgi
 from nova.api import wsgi as base_wsgi
+from nova.api.openstack.compute import server_screenshots
 
 
 def _create_controller(main_controller, action_controller_list):
@@ -351,6 +352,10 @@ virtual_interfaces_controller = functools.partial(_create_controller,
 volumes_controller = functools.partial(_create_controller,
     volumes.VolumeController, [])
 
+
+server_screenshots_controller = functools.partial(
+    _create_controller, server_screenshots.ServerScreenshotsController, []
+)
 
 # NOTE(alex_xu): This is structure of this route list as below:
 # (
@@ -841,6 +846,14 @@ ROUTE_LIST = (
     ('/servers/{server_id}/topology', {
         'GET': [server_topology_controller, 'index']
     }),
+    (
+        '/servers/{server_id}/screenshots/{id}',
+        {
+            'GET': [server_screenshots_controller, 'show'],
+            'PUT': [server_screenshots_controller, 'update'],
+            'DELETE': [server_screenshots_controller, 'delete'],
+        },
+    ),
 )
 
 

@@ -2393,3 +2393,12 @@ class InvalidImageFormatWhenDetach(Invalid):
 class InvalidBdmWhenDetach(Invalid):
     msg_fmt = _("Instance %(instance.uuid)s has not "
                 "been attached a volume yet")
+
+
+class InstanceScreenshotNotFound(NotFound):
+    msg_fmt = _("Screenshot %(screenshot_id)s could not be found.")
+
+
+class InstanceScreenNotFound(NotFound):
+    msg_fmt = _("Instance %(instance_id)s the screen %(screen)s "
+                "could not be found.")

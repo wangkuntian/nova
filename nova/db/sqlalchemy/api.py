@@ -4638,3 +4638,90 @@ def console_auth_token_destroy_expired_by_host(context, host):
         filter_by(host=host).\
         filter(models.ConsoleAuthToken.expires <= timeutils.utcnow_ts()).\
         delete()
+
+
+def _screenshot_get_query(context, columns_to_join=None):
+    if columns_to_join is None:
+        columns_to_join = []
+
+    query = model_query(context, models.InstanceScreenshot)
+
+    for column in columns_to_join:
+        query = query.options(joinedload(column))
+
+    return query
+
+
+@pick_context_manager_reader
+def screenshot_get_by_id(context, screenshot_id):
+    query = model_query(context, models.InstanceScreenshot).filter_by(
+        id=screenshot_id
+    )
+    result = query.first()
+    if not result:
+        raise exception.InstanceScreenshotNotFound(screenshot_id=screenshot_id)
+    return result
+
+
+@pick_context_manager_reader
+def screenshot_get_by_uuid(context, screenshot_uuid):
+    query = model_query(context, models.InstanceScreenshot).filter_by(
+        uuid=screenshot_uuid
+    )
+    result = query.first()
+    if not result:
+        raise exception.InstanceScreenshotNotFound(
+            screenshot_id=screenshot_uuid
+        )
+    return result
+
+
+@require_context
+@pick_context_manager_reader_allow_async
+def screenshot_get_all_by_instance(
+    context,
+    instance_uuid,
+    sort_key='created_at',
+    sort_dir='desc',
+    limit=None,
+    marker=None,
+):
+    query = _screenshot_get_query(context).filter_by(
+        instance_uuid=instance_uuid
+    )
+    marker_row = None
+    if marker is not None:
+        marker_row = (
+            _screenshot_get_query(context).filter_by(uuid=marker).first()
+        )
+        if not marker_row:
+            raise exception.MarkerNotFound(marker=marker)
+    query = sqlalchemyutils.paginate_query(
+        query,
+        models.InstanceScreenshot,
+        limit,
+        [sort_key, 'id'],
+        marker=marker_row,
+        sort_dir=sort_dir,
+    )
+    return query
+
+
+@require_context
+@oslo_db_api.wrap_db_retry(max_retries=5, retry_on_deadlock=True)
+@pick_context_manager_writer
+def screenshot_create(context, values):
+    db_screenshot = models.InstanceScreenshot()
+    db_screenshot.update(values)
+    db_screenshot.save(context.session)
+    return db_screenshot
+
+
+@require_context
+@pick_context_manager_writer
+def screenshot_destroy(context, screenshot_id):
+    (
+        _screenshot_get_query(context)
+        .filter_by(id=screenshot_id)
+        .soft_delete(synchronize_session=False)
+    )

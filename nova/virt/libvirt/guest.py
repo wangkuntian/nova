@@ -732,6 +732,20 @@ class Guest(object):
         else:
             return JobInfo._get_job_stats_compat(self._domain)
 
+    def take_screenshot(self, stream, screen):
+        try:
+            image_type = self._domain.screenshot(stream, screen)
+            LOG.debug('Screenshot saved as type: %s', image_type)
+        except libvirt.libvirtError as ex:
+            error_code = ex.get_error_code()
+            if error_code == libvirt.VIR_ERR_OPERATION_INVALID:
+                raise exception.InstanceScreenNotFound(
+                    instance_id=self.uuid, screen=screen
+                )
+            msg = (f'Error for taking {self.name} screenshot: '
+                   f'[Error Code {error_code}] {ex}')
+            LOG.error(msg)
+
 
 class BlockDevice(object):
     """Wrapper around block device API"""

@@ -5816,6 +5816,58 @@ class API(base.Base):
                                             block_device_info=None,
                                             reboot_type='HARD')
 
+    @check_instance_state(vm_state=[vm_states.ACTIVE], task_state=None)
+    def take_screenshot(self, context, instance, screenshot):
+        screen = screenshot.get('screen', 0)
+        name = screenshot.get('name', None)
+        image_format = screenshot.get('format', 'png')
+        LOG.debug('creating screenshot for instance %s', instance.uuid)
+        screenshot = objects.InstanceScreenshot(
+            context=context,
+            instance_uuid=instance.uuid,
+            name=name,
+            screen=screen,
+            format=image_format,
+        )
+        screenshot.create()
+        screenshot = self.compute_rpcapi.take_screenshot(
+            context, instance, screenshot
+        )
+        return screenshot
+
+    @staticmethod
+    def get_screenshots(
+            context,
+            instance,
+            sort_key='created_at',
+            sort_dir='desc',
+            limit=None,
+            marker=None,
+    ):
+        screenshots = objects.InstanceScreenshotList.get_by_instance_uuid(
+            context, instance.uuid, sort_key, sort_dir, limit, marker
+        )
+        return screenshots
+
+    @staticmethod
+    def get_screenshot(context, screenshot_id):
+        screenshot = objects.InstanceScreenshot.get_by_uuid(
+            context, screenshot_id
+        )
+        return screenshot
+
+    def delete_screenshot(self, context, instance, screenshot_id):
+        screenshot = self.get_screenshot(context, screenshot_id)
+        screenshot.destroy()
+        self.compute_rpcapi.delete_screenshot(context, instance, screenshot)
+
+    def update_screenshot(self, context, screenshot_id, updates):
+        screenshot = self.get_screenshot(context, screenshot_id)
+        name = updates.get('name')
+        screenshot.name = name
+        screenshot.save()
+        return screenshot
+
 
 def target_host_cell(fn):
     """Target a host-based function to a cell.

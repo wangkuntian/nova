@@ -1890,6 +1890,14 @@ class ComputeDriver(object):
         """
         return True
 
+    def take_screenshot(self, instance, screenshot):
+        """Take a screenshot of the specified instance."""
+        pass
+
+    def delete_screenshot(self, instance, screenshot):
+        """Delete a screenshot of the specified instance."""
+        pass
+
 
 def load_compute_driver(virtapi, compute_driver=None):
     """Load a compute driver module.

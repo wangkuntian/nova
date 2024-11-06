@@ -66,6 +66,7 @@ from nova.conf import vnc
 from nova.conf import workarounds
 from nova.conf import wsgi
 from nova.conf import zvm
+from nova.conf import s3
 
 CONF = cfg.CONF
 
@@ -116,3 +117,4 @@ vnc.register_opts(CONF)
 workarounds.register_opts(CONF)
 wsgi.register_opts(CONF)
 zvm.register_opts(CONF)
+s3.register_opts(CONF)
